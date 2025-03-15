@@ -1,0 +1,16 @@
+# Cursor Updates
+
+- Refactored code for improved maintainability and best practices:
+  - Renamed Index.html to index.html for consistency
+  - Removed redundant logging in server.js
+  - Extracted sample data and testing functions to sampleData.js
+  - Created utils.js for utility functions
+  - Added build script to package.json
+  - Maintained CommonJS module format across files
+- UI and UX improvements:
+  - Removed Profile item from user dropdown
+  - Renamed Reports section to Dashboard
+  - Added date range selector for charts
+  - Improved chart display with cleaner labels showing only week start date
+  - Added margin to delete button for better spacing
+  - Removed redundant chart titles for cleaner interface 
