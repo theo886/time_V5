@@ -1,14 +1,14 @@
 // Weekly Percentage Tracker (Vanilla JavaScript)
 document.addEventListener('DOMContentLoaded', function() {
   // Configuration flags
-  const debugMode = true; // Set to false to disable fake data loading
+  const debugMode = false; // Set to false to disable fake data loading
   
   // Access projects and loadFakeDataForTesting from global scope
   const projects = window.projectData.projects;
   const loadFakeDataForTesting = window.loadFakeDataForTesting;
   
   // Access utility functions from global scope
-  const { validateEntries, calculateTotal, redistributePercentages, formatWeekRange } = window.utilsFunctions;
+  const { validateEntries, calculateTotal, redistributePercentages, formatWeekRange, showNotification } = window.utilsFunctions;
 
   // State variables
   let currentWeek = setInitialWeek();
@@ -23,10 +23,49 @@ document.addEventListener('DOMContentLoaded', function() {
   let isSubmitted = false;
   let isModified = false;
   let entryInputModes = {}; // Will store entry.id -> 'percent' or 'hours'
+  let isLoading = true; // State to track if we're loading data
   
-  // Load fake data for testing if in debug mode
+  // Load data from database or use fake data for testing
   if (debugMode) {
     previousSubmissions = loadFakeDataForTesting(currentWeek, formatWeekRange);
+    isLoading = false;
+  } else {
+    // Load real data from API
+    loadDataFromDatabase();
+  }
+  
+  /**
+   * Loads timesheet data from the database
+   */
+  async function loadDataFromDatabase() {
+    isLoading = true;
+    render(); // Show loading state
+    
+    try {
+      // Fetch all time entries for the current user
+      previousSubmissions = await window.apiClient.getAllTimeEntries();
+      
+      // Check if current week is already submitted
+      const weekKey = formatWeekRange(currentWeek);
+      const weekEntries = previousSubmissions[weekKey];
+      
+      if (weekEntries) {
+        // Use entries from database
+        entries = weekEntries.map(entry => ({
+          ...entry,
+          id: Date.now() + Math.random() // Generate new IDs
+        }));
+        isSubmitted = true;
+      }
+      
+      showNotification('success', 'Data Loaded', 'Timesheet data loaded successfully');
+    } catch (err) {
+      console.error('Error loading data from database:', err);
+      showNotification('error', 'Error', 'Failed to load timesheet data');
+    } finally {
+      isLoading = false;
+      render();
+    }
   }
 
   // DOM elements
@@ -322,6 +361,33 @@ document.addEventListener('DOMContentLoaded', function() {
     const pinButton = document.getElementById('pin-button');
     pinButton.className = `mr-2 ${isPinned ? 'text-black' : 'text-slate-400'}`;
     
+    // Show loading overlay if loading
+    const entriesContainer = document.getElementById('entries-container');
+    const addProjectButton = document.getElementById('add-project-button');
+    const submitButton = document.getElementById('submit-button');
+    
+    if (isLoading) {
+      // Show loading state
+      entriesContainer.innerHTML = `
+        <div class="flex justify-center items-center p-8">
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        </div>
+        <div class="text-center text-slate-500">Loading timesheet data...</div>
+      `;
+      
+      // Disable buttons during loading
+      addProjectButton.disabled = true;
+      addProjectButton.classList.add('opacity-50', 'cursor-not-allowed');
+      submitButton.disabled = true;
+      submitButton.classList.add('opacity-50', 'cursor-not-allowed');
+      
+      return; // Exit early - don't render other elements while loading
+    }
+    
+    // Re-enable buttons after loading (if they should be enabled)
+    addProjectButton.disabled = isAnyDropdownOpen;
+    addProjectButton.classList.remove('opacity-50', 'cursor-not-allowed');
+    
     // Update error display
     const errorContainer = document.getElementById('error-container');
     if (error && error !== "Please select a project for all entries" && error !== "Please enter percentage for all selected projects") {
@@ -574,7 +640,7 @@ document.addEventListener('DOMContentLoaded', function() {
     return `${startDate.getMonth() + 1}/${startDate.getDate()}/${startDate.getFullYear()}`;
   }
 
-  function goToPreviousWeek() {
+  async function goToPreviousWeek() {
     const prevWeek = new Date(currentWeek);
     prevWeek.setDate(prevWeek.getDate() - 7);
     currentWeek = prevWeek;
@@ -595,38 +661,79 @@ document.addEventListener('DOMContentLoaded', function() {
       });
       isSubmitted = false;
       isModified = false;
+      render();
     } else {
       // Check if we have stored entries for the previous week
       const prevWeekKey = formatWeekRange(prevWeek);
+      
+      // First check local cache
       const previousWeekEntries = previousSubmissions[prevWeekKey];
       
-      // Check if the previous week was submitted
-      isSubmitted = !!previousWeekEntries;
-      isModified = false;
-      
-      // If we have previous entries for this week, use them
       if (previousWeekEntries && previousWeekEntries.length > 0) {
-        entries = previousWeekEntries.map(entry => {
-          const newId = Date.now() + Math.random(); // Generate new IDs
-          entryInputModes[newId] = 'percent'; // Set default input mode
-          return {
-            ...entry,
-            id: newId
-          };
-        });
+        // Use locally cached entries
+        loadStoredEntries(previousWeekEntries, true);
+        render();
       } else {
-        // Otherwise start with a blank slate
-        const newId = Date.now();
-        entries = [{ id: newId, projectId: "", percentage: "100", isManuallySet: false }];
-        entryInputModes[newId] = 'percent'; // Set default input mode
-        manuallyEditedIds = new Set();
+        // Try to fetch from database if not in local cache
+        isLoading = true;
+        render();
+        
+        try {
+          const result = await window.apiClient.getTimeEntryForWeek(prevWeekKey);
+          
+          if (result && result.entries) {
+            // Use entries from database
+            loadStoredEntries(result.entries, true);
+            // Also update local cache
+            previousSubmissions[prevWeekKey] = result.entries;
+          } else {
+            // Start with a blank slate
+            resetToNewEntries();
+            isSubmitted = false;
+          }
+        } catch (err) {
+          console.error(`Error fetching entries for week ${prevWeekKey}:`, err);
+          showNotification('error', 'Error', 'Failed to load timesheet data');
+          resetToNewEntries();
+          isSubmitted = false;
+        } finally {
+          isLoading = false;
+          render();
+        }
       }
     }
+  }
+  
+  /**
+   * Loads stored entries into the current state
+   * @param {Array} storedEntries - Stored entries from cache or database
+   * @param {boolean} markAsSubmitted - Whether to mark as submitted
+   */
+  function loadStoredEntries(storedEntries, markAsSubmitted) {
+    entries = storedEntries.map(entry => {
+      const newId = Date.now() + Math.random(); // Generate new IDs
+      entryInputModes[newId] = 'percent'; // Set default input mode
+      return {
+        ...entry,
+        id: newId
+      };
+    });
     
-    render();
+    isSubmitted = markAsSubmitted;
+    isModified = false;
+  }
+  
+  /**
+   * Resets to new empty entries
+   */
+  function resetToNewEntries() {
+    const newId = Date.now();
+    entries = [{ id: newId, projectId: "", percentage: "100", isManuallySet: false }];
+    entryInputModes[newId] = 'percent'; // Set default input mode
+    manuallyEditedIds = new Set();
   }
 
-  function goToNextWeek() {
+  async function goToNextWeek() {
     const nextWeek = new Date(currentWeek);
     nextWeek.setDate(nextWeek.getDate() + 7);
     currentWeek = nextWeek;
@@ -647,35 +754,47 @@ document.addEventListener('DOMContentLoaded', function() {
       });
       isSubmitted = false;
       isModified = false;
+      render();
     } else {
-      // Get the next week's entries if they exist
+      // Check if we have stored entries for the next week
       const nextWeekKey = formatWeekRange(nextWeek);
-      const previousWeekEntries = previousSubmissions[nextWeekKey];
       
-      // Check if the next week was submitted
-      isSubmitted = !!previousWeekEntries;
-      isModified = false;
+      // First check local cache
+      const nextWeekEntries = previousSubmissions[nextWeekKey];
       
-      // If we have previous entries for the next week, use them
-      if (previousWeekEntries && previousWeekEntries.length > 0) {
-        entries = previousWeekEntries.map(entry => {
-          const newId = Date.now() + Math.random(); // Generate new IDs
-          entryInputModes[newId] = 'percent'; // Set default input mode
-          return {
-            ...entry,
-            id: newId
-          };
-        });
+      if (nextWeekEntries && nextWeekEntries.length > 0) {
+        // Use locally cached entries
+        loadStoredEntries(nextWeekEntries, true);
+        render();
       } else {
-        // Otherwise start with a blank slate
-        const newId = Date.now();
-        entries = [{ id: newId, projectId: "", percentage: "100", isManuallySet: false }];
-        entryInputModes[newId] = 'percent'; // Set default input mode
-        manuallyEditedIds = new Set();
+        // Try to fetch from database if not in local cache
+        isLoading = true;
+        render();
+        
+        try {
+          const result = await window.apiClient.getTimeEntryForWeek(nextWeekKey);
+          
+          if (result && result.entries) {
+            // Use entries from database
+            loadStoredEntries(result.entries, true);
+            // Also update local cache
+            previousSubmissions[nextWeekKey] = result.entries;
+          } else {
+            // Start with a blank slate
+            resetToNewEntries();
+            isSubmitted = false;
+          }
+        } catch (err) {
+          console.error(`Error fetching entries for week ${nextWeekKey}:`, err);
+          showNotification('error', 'Error', 'Failed to load timesheet data');
+          resetToNewEntries();
+          isSubmitted = false;
+        } finally {
+          isLoading = false;
+          render();
+        }
       }
     }
-    
-    render();
   }
 
   function addEntry() {
@@ -875,7 +994,7 @@ document.addEventListener('DOMContentLoaded', function() {
     return entries.filter(entry => entry.projectId === projectId).length > 1;
   }
 
-  function submitTimesheet() {
+  async function submitTimesheet() {
     const total = calculateTotalWrapper();
     
     if (total !== 100) {
@@ -900,28 +1019,43 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
     
-    // In a real app, you would send this data to an API
-    const timesheetData = {
-      weekStarting: formatWeekRange(currentWeek),
-      entries: entries.map(entry => ({
-        projectId: entry.projectId,
-        projectName: projects.find(p => p.id.toString() === entry.projectId)?.name,
-        percentage: entry.percentage
-      })),
-      total: total
-    };
-    
-    console.log("Submitting timesheet:", timesheetData);
-    
-    // Store this week's entries for future reference
-    const weekKey = formatWeekRange(currentWeek);
-    previousSubmissions[weekKey] = [...entries];
-    
-    // Update submission state
-    isSubmitted = true;
-    isModified = false;
-    
+    // Set loading state
+    isLoading = true;
     render();
+    
+    try {
+      // Prepare data for API
+      const weekKey = formatWeekRange(currentWeek);
+      
+      // Create a version of entries that is suitable for storage
+      // (without temporary client-side IDs)
+      const entriesForStorage = entries.map(entry => ({
+        projectId: entry.projectId,
+        percentage: entry.percentage,
+        isManuallySet: entry.isManuallySet
+      }));
+      
+      // Save to database
+      await window.apiClient.saveTimeEntry(weekKey, entriesForStorage);
+      
+      // Store this week's entries for local reference
+      previousSubmissions[weekKey] = [...entries];
+      
+      // Update submission state
+      isSubmitted = true;
+      isModified = false;
+      
+      showNotification('success', 'Saved', 'Timesheet saved successfully');
+    } catch (err) {
+      console.error('Error saving timesheet:', err);
+      showNotification('error', 'Error', 'Failed to save timesheet');
+      
+      // Re-render with error message
+      error = "Failed to save timesheet. Please try again.";
+    } finally {
+      isLoading = false;
+      render();
+    }
   }
 
   function updateSubmitButton() {
@@ -1080,6 +1214,19 @@ document.addEventListener('DOMContentLoaded', function() {
       return new Date(year, month - 1, day); // Note: months are 0-indexed in JS Date
     };
     
+    // Helper function to normalize entries format
+    // This handles both the old format (array of entries) and the new DB format
+    const normalizeEntries = (weekKey, rawEntries) => {
+      // If rawEntries is already an array, return it
+      if (Array.isArray(rawEntries)) {
+        return rawEntries;
+      }
+      
+      // Log an error if we can't parse the entries
+      console.error(`Invalid entries format for week ${weekKey}:`, rawEntries);
+      return [];
+    };
+    
     // Check if we have actual submissions
     if (submissionWeeks.length > 0) {
       console.log("Using real submission data for charts");
@@ -1096,7 +1243,7 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // First pass: track when each project first appears
       sortedWeeks.forEach((week, weekIndex) => {
-        const weekEntries = previousSubmissions[week];
+        const weekEntries = normalizeEntries(week, previousSubmissions[week]);
         
         weekEntries.forEach(entry => {
           if (!entry.projectId) return;
@@ -1112,7 +1259,7 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // Process each submitted week in chronological order
       sortedWeeks.forEach((week, weekIndex) => {
-        const weekEntries = previousSubmissions[week];
+        const weekEntries = normalizeEntries(week, previousSubmissions[week]);
         // Get the start date from the week string and format it
         const weekStartDate = getWeekStartDate(week);
         timeData.labels.push(formatWeekStart(weekStartDate));

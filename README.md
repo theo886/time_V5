@@ -1,51 +1,81 @@
 # Weekly Percentage Tracker
 
-A simple web application to track weekly time allocation across different projects.
+A web application to track weekly time allocation across different projects with database storage.
 
 ## Features
 
 - Track time allocation by percentage across multiple projects
-- Navigate between weeks
+- Navigate between weeks with data persistence
 - Pin project configurations to carry them forward to future weeks
 - Automatic percentage redistribution for unallocated time
 - Validation to ensure total equals 100%
-- Submit and update timesheet data
+- Submit and update timesheet data to Azure SQL Database
+- Dashboard visualization of time allocation trends
+- Toggle between percentage and hour-based entry
+- Responsive design for desktop and mobile
 
 ## How to Run
 
-### Option 1: Using Node.js (recommended)
+### Setting up the Database Connection
 
-1. Make sure you have [Node.js](https://nodejs.org/) installed on your computer
-2. Open a terminal/command prompt
-3. Navigate to the project directory
-4. Run the following command:
+1. Create a `.env` file in the project root with your Azure SQL database credentials:
+   ```
+   DB_SERVER=your-server.database.windows.net
+   DB_NAME=your-database-name
+   DB_USER=your-username
+   DB_PASSWORD=your-password
+   DB_PORT=1433
+   PORT=8080
+   ```
 
-```
-node server.js
-```
+2. Install dependencies:
+   ```
+   npm install
+   ```
 
-5. Open your web browser and navigate to [http://localhost:8080](http://localhost:8080)
+3. Start the server:
+   ```
+   node server.js
+   ```
 
-### Option 2: Opening the HTML File Directly
-
-You can also simply open the `index.html` file in a web browser. However, this may have limitations with some browsers' security policies.
+4. Open your web browser and navigate to [http://localhost:8080](http://localhost:8080)
 
 ## Usage
 
 1. Select projects from the dropdown menu
-2. Enter percentage allocations for each project
+2. Enter percentage allocations for each project (or click the % icon to switch to hours)
 3. Add additional projects using the "Add Project" button
 4. Navigate between weeks using the "Prev" and "Next" buttons
 5. Use the pin button to maintain the same project configuration when moving to a new week
 6. Submit your timesheet when the total equals 100%
+7. View your submission history and trends in the Dashboard
 
 ## Project Structure
 
-- `Index.html` - The main HTML file
-- `index.js` - The application logic
-- `server.js` - A simple Node.js server for local development
+- `index.html` - The main HTML file
+- `index.js` - The front-end application logic
+- `utils.js` - Utility functions for calculations and UI
+- `apiClient.js` - Front-end API client for database communication
+- `server.js` - Node.js server with API endpoints
+- `dbConfig.js` - Database connection configuration
+- `dbService.js` - Database service functions
+- `data/projectData.js` - Project definitions
+- `sampleData.js` - Sample data for testing
+
+## Database Integration
+
+The application integrates with Azure SQL Database for persistent storage:
+
+- Timesheets are stored and retrieved from the database
+- Local caching is used for offline capabilities
+- API endpoints handle CRUD operations for timesheet data
+- Automatic data loading when navigating between weeks
+- Error handling with user-friendly notifications
+
+For more details on the database integration, see `db-implementation.md`.
 
 ## Notes
 
-- This is a client-side only application. In a real-world scenario, you would want to add server-side storage.
-- The application uses sample project data defined in the JavaScript file. 
+- The application uses a mock user ID for demonstration purposes
+- In a production environment, proper authentication should be implemented
+- The database schema is created automatically on first run

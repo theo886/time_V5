@@ -20,6 +20,18 @@
   <script src="utils.js"></script>
   <script src="data/projectData.js"></script>
   <script src="sampleData.js"></script>
+  <script src="apiClient.js"></script>
   <script src="index.js"></script>
+
+  <!-- Notification element for API operations -->
+  <div id="notification" class="fixed bottom-4 right-4 p-4 rounded shadow-lg hidden transform transition-transform duration-300 translate-y-full">
+    <div class="flex items-center">
+      <div id="notification-icon" class="mr-3"></div>
+      <div>
+        <div id="notification-title" class="font-semibold"></div>
+        <div id="notification-message" class="text-sm"></div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

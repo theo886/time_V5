@@ -132,11 +132,82 @@ function formatWeekRange(startDate) {
   return `${formatDate(startDate)} - ${formatDate(endDate)}`;
 }
 
+/**
+ * Shows a notification to the user
+ * @param {string} type - The type of notification ('success', 'error', 'info')
+ * @param {string} title - The title of the notification
+ * @param {string} message - The message to display
+ * @param {number} duration - How long to show the notification in ms
+ */
+function showNotification(type, title, message, duration = 3000) {
+  const notification = document.getElementById('notification');
+  const notificationIcon = document.getElementById('notification-icon');
+  const notificationTitle = document.getElementById('notification-title');
+  const notificationMessage = document.getElementById('notification-message');
+  
+  // Set content
+  notificationTitle.textContent = title;
+  notificationMessage.textContent = message;
+  
+  // Set type-specific styles
+  notification.classList.remove('bg-green-100', 'bg-red-100', 'bg-blue-100');
+  notificationTitle.classList.remove('text-green-800', 'text-red-800', 'text-blue-800');
+  notificationMessage.classList.remove('text-green-600', 'text-red-600', 'text-blue-600');
+  
+  // Set icon based on type
+  let iconSvg = '';
+  
+  if (type === 'success') {
+    notification.classList.add('bg-green-100');
+    notificationTitle.classList.add('text-green-800');
+    notificationMessage.classList.add('text-green-600');
+    iconSvg = `
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+      </svg>
+    `;
+  } else if (type === 'error') {
+    notification.classList.add('bg-red-100');
+    notificationTitle.classList.add('text-red-800');
+    notificationMessage.classList.add('text-red-600');
+    iconSvg = `
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    `;
+  } else {
+    notification.classList.add('bg-blue-100');
+    notificationTitle.classList.add('text-blue-800');
+    notificationMessage.classList.add('text-blue-600');
+    iconSvg = `
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    `;
+  }
+  
+  notificationIcon.innerHTML = iconSvg;
+  
+  // Show notification
+  notification.classList.remove('hidden', 'translate-y-full');
+  
+  // Hide after duration
+  setTimeout(() => {
+    notification.classList.add('translate-y-full');
+    
+    // Set to hidden after transition completes
+    setTimeout(() => {
+      notification.classList.add('hidden');
+    }, 300); // Match the transition duration
+  }, duration);
+}
+
 // Expose functions globally
 window.utilsFunctions = {
   validateEntries,
   calculateTotal,
   hasDuplicateProjects, 
   redistributePercentages,
-  formatWeekRange
+  formatWeekRange,
+  showNotification
 }; 
