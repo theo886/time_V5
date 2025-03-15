@@ -5,10 +5,13 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "build": "mkdir -p build && cp -r *.html *.js *.json data build/ && echo 'Build completed successfully'",
+    "build": "mkdir -p public && cp -r *.html *.js *.json data public/ && echo 'Build completed successfully'",
     "test": "echo \"Error: no test specified\" && exit 1",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   },
   "keywords": [
     "timesheet",
@@ -30,6 +33,7 @@
   "dependencies": {
     "autoprefixer": "^10.4.20",
     "dotenv": "^16.4.7",
+    "express": "^4.21.2",
     "mssql": "^11.0.1",
     "postcss": "^8.5.3",
     "tailwindcss": "^4.0.12"

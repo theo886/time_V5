@@ -16,16 +16,17 @@ A web application to track weekly time allocation across different projects with
 
 ## How to Run
 
-### Setting up the Database Connection
+### Local Development
 
 1. Create a `.env` file in the project root with your Azure SQL database credentials:
    ```
+   NODE_ENV=development
+   PORT=8080
    DB_SERVER=your-server.database.windows.net
    DB_NAME=your-database-name
    DB_USER=your-username
    DB_PASSWORD=your-password
    DB_PORT=1433
-   PORT=8080
    ```
 
 2. Install dependencies:
@@ -39,6 +40,20 @@ A web application to track weekly time allocation across different projects with
    ```
 
 4. Open your web browser and navigate to [http://localhost:8080](http://localhost:8080)
+
+### Azure App Service Deployment
+
+For secure deployment to Azure App Service with managed identity authentication:
+
+1. Follow the instructions in [AZURE-DEPLOYMENT.md](AZURE-DEPLOYMENT.md)
+2. This approach eliminates the need for stored database credentials
+3. Provides enhanced security and follows Azure best practices
+
+**Benefits of Azure deployment:**
+- Managed identity authentication (no passwords stored)
+- Automated deployment through GitHub Actions
+- Better security with Azure App Service features
+- Scale as needed with Azure's infrastructure
 
 ## Usage
 

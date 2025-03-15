@@ -1,6 +1,6 @@
 /**
  * Database configuration for the Weekly Percentage Tracker
- * Handles the connection to Azure SQL Database
+ * Configured for Azure App Service with managed identity
  */
 
 // Load environment variables
@@ -8,24 +8,46 @@ require('dotenv').config();
 
 const sql = require('mssql');
 
+// Check for environment to determine which authentication to use
+const isProduction = process.env.NODE_ENV === 'production';
+
 // SQL Server configuration
-const config = {
-  server: process.env.DB_SERVER,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  port: parseInt(process.env.DB_PORT || '1433'),
-  options: {
-    encrypt: true, // For Azure SQL Database
-    trustServerCertificate: false, // Change to true for local dev / self-signed certs
-    enableArithAbort: true
-  },
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000
-  }
-};
+const config = isProduction 
+  ? {
+      // Azure App Service configuration with managed identity
+      connectionString: process.env.AZURE_SQL_CONNECTIONSTRING,
+      authentication: {
+        type: 'azure-active-directory-msi-app-service'
+      },
+      options: {
+        encrypt: true,
+        trustServerCertificate: false,
+        enableArithAbort: true
+      },
+      pool: {
+        max: 10,
+        min: 0,
+        idleTimeoutMillis: 30000
+      }
+    }
+  : {
+      // Local development configuration with SQL authentication
+      server: process.env.DB_SERVER,
+      database: process.env.DB_NAME,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      port: parseInt(process.env.DB_PORT || '1433'),
+      options: {
+        encrypt: true,
+        trustServerCertificate: false,
+        enableArithAbort: true
+      },
+      pool: {
+        max: 10,
+        min: 0,
+        idleTimeoutMillis: 30000
+      }
+    };
 
 // Create a connection pool once
 let pool = null;
