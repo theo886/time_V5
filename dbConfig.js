@@ -11,11 +11,49 @@ const sql = require('mssql');
 // Check for environment to determine which authentication to use
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Parse connection string to extract server and database
+function parseConnectionString(connStr) {
+  if (!connStr) return null;
+  
+  const params = {};
+  const parts = connStr.split(';');
+  
+  parts.forEach(part => {
+    const keyValue = part.split('=');
+    if (keyValue.length === 2) {
+      let key = keyValue[0].trim();
+      let value = keyValue[1].trim();
+      
+      // Handle special keys
+      if (key.toLowerCase() === 'server') {
+        // Remove 'tcp:' prefix if present
+        value = value.replace(/^tcp:/i, '');
+      } else if (key.toLowerCase() === 'initial catalog') {
+        key = 'database';
+      }
+      
+      params[key.toLowerCase()] = value;
+    }
+  });
+  
+  return params;
+}
+
+// Get connection details
+let connectionParams = {};
+if (isProduction && process.env.AZURE_SQL_CONNECTIONSTRING) {
+  console.log('Parsing connection string for production environment');
+  connectionParams = parseConnectionString(process.env.AZURE_SQL_CONNECTIONSTRING);
+  console.log('Extracted server:', connectionParams.server);
+  console.log('Extracted database:', connectionParams.database);
+}
+
 // SQL Server configuration
 const config = isProduction 
   ? {
       // Azure App Service configuration with managed identity
-      connectionString: process.env.AZURE_SQL_CONNECTIONSTRING,
+      server: connectionParams.server, // Extract from connection string
+      database: connectionParams.database, // Extract from connection string
       authentication: {
         type: 'azure-active-directory-msi-app-service'
       },
