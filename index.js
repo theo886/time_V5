@@ -25,10 +25,21 @@ document.addEventListener('DOMContentLoaded', function() {
   let entryInputModes = {}; // Will store entry.id -> 'percent' or 'hours'
   let isLoading = true; // State to track if we're loading data
   
+  // DOM elements - first set up the main container
+  const container = document.getElementById('weekly-tracker') || document.body;
+  container.innerHTML = createInitialHTML();
+  
+  // Initialize event listeners
+  initializeEventListeners();
+  
+  // Render the initial state
+  render();
+  
   // Load data from database or use fake data for testing
   if (debugMode) {
     previousSubmissions = loadFakeDataForTesting(currentWeek, formatWeekRange);
     isLoading = false;
+    render(); // Update UI after data is loaded
   } else {
     // Load real data from API
     loadDataFromDatabase();
@@ -67,16 +78,6 @@ document.addEventListener('DOMContentLoaded', function() {
       render();
     }
   }
-
-  // DOM elements
-  const container = document.getElementById('weekly-tracker') || document.body;
-  container.innerHTML = createInitialHTML();
-  
-  // Initialize event listeners
-  initializeEventListeners();
-  
-  // Render the initial state
-  render();
 
   // Add a global click event listener to close dropdowns when clicking outside
   document.addEventListener('click', function(event) {
@@ -293,79 +294,125 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function initializeEventListeners() {
-    // Pin button
-    document.getElementById('pin-button').addEventListener('click', togglePin);
-    
-    // Week navigation
-    document.getElementById('prev-week-button').addEventListener('click', goToPreviousWeek);
-    document.getElementById('next-week-button').addEventListener('click', goToNextWeek);
-    
-    // Add project button
-    document.getElementById('add-project-button').addEventListener('click', addEntry);
-    
-    // Submit button
-    document.getElementById('submit-button').addEventListener('click', submitTimesheet);
-    
-    // User dropdown button
-    const userDropdownBtn = document.getElementById('user-dropdown-btn');
-    const userDropdownContent = document.getElementById('user-dropdown-content');
-    
-    if (userDropdownBtn && userDropdownContent) {
-      // Toggle dropdown when clicking the button
-      userDropdownBtn.addEventListener('click', function(event) {
-        userDropdownContent.classList.toggle('show');
-        event.stopPropagation();
-      });
+    try {
+      // Pin button
+      const pinButton = document.getElementById('pin-button');
+      if (pinButton) {
+        pinButton.addEventListener('click', togglePin);
+      } else {
+        console.warn('Pin button not found');
+      }
       
-      // Close dropdown when clicking elsewhere on the page
-      document.addEventListener('click', function(event) {
-        if (!event.target.closest('.user-dropdown') && userDropdownContent.classList.contains('show')) {
-          userDropdownContent.classList.remove('show');
+      // Week navigation
+      const prevWeekButton = document.getElementById('prev-week-button');
+      if (prevWeekButton) {
+        prevWeekButton.addEventListener('click', goToPreviousWeek);
+      } else {
+        console.warn('Previous week button not found');
+      }
+      
+      const nextWeekButton = document.getElementById('next-week-button');
+      if (nextWeekButton) {
+        nextWeekButton.addEventListener('click', goToNextWeek);
+      } else {
+        console.warn('Next week button not found');
+      }
+      
+      // Add project button
+      const addProjectButton = document.getElementById('add-project-button');
+      if (addProjectButton) {
+        addProjectButton.addEventListener('click', addEntry);
+      } else {
+        console.warn('Add project button not found');
+      }
+      
+      // Submit button
+      const submitButton = document.getElementById('submit-button');
+      if (submitButton) {
+        submitButton.addEventListener('click', submitTimesheet);
+      } else {
+        console.warn('Submit button not found');
+      }
+      
+      // User dropdown button
+      const userDropdownBtn = document.getElementById('user-dropdown-btn');
+      const userDropdownContent = document.getElementById('user-dropdown-content');
+      
+      if (userDropdownBtn && userDropdownContent) {
+        // Toggle dropdown when clicking the button
+        userDropdownBtn.addEventListener('click', function(event) {
+          userDropdownContent.classList.toggle('show');
+          event.stopPropagation();
+        });
+        
+        // Close dropdown when clicking elsewhere on the page
+        document.addEventListener('click', function(event) {
+          if (!event.target.closest('.user-dropdown') && userDropdownContent.classList.contains('show')) {
+            userDropdownContent.classList.remove('show');
+          }
+        });
+        
+        // Handle dropdown menu items
+        userDropdownContent.querySelectorAll('a').forEach(item => {
+          item.addEventListener('click', function(event) {
+            event.preventDefault();
+            const action = this.textContent.trim();
+            
+            if (action === 'Dashboard') {
+              showReportsPage();
+            } else {
+              alert(`You clicked: ${action}`);
+            }
+            
+            userDropdownContent.classList.remove('show');
+          });
+        });
+      } else {
+        console.warn('User dropdown elements not found');
+      }
+      
+      // Add event listener for repositioning open dropdowns on resize
+      window.addEventListener('resize', () => {
+        try {
+          const openDropdown = document.querySelector('[data-dropdown]:not(.hidden)');
+          if (openDropdown) {
+            const id = openDropdown.dataset.dropdown;
+            document.dispatchEvent(new CustomEvent('dropdown-toggled', { 
+              detail: { id: id }
+            }));
+          }
+        } catch (error) {
+          console.error('Error handling resize event:', error);
         }
       });
       
-      // Handle dropdown menu items
-      userDropdownContent.querySelectorAll('a').forEach(item => {
-        item.addEventListener('click', function(event) {
-          event.preventDefault();
-          const action = this.textContent.trim();
-          
-          if (action === 'Dashboard') {
-            showReportsPage();
-          } else {
-            alert(`You clicked: ${action}`);
-          }
-          
-          userDropdownContent.classList.remove('show');
-        });
-      });
+      console.log('Event listeners initialized successfully');
+    } catch (error) {
+      console.error('Error initializing event listeners:', error);
     }
-
-    // Add event listener for repositioning open dropdowns on resize
-    window.addEventListener('resize', () => {
-      const openDropdown = document.querySelector('[data-dropdown]:not(.hidden)');
-      if (openDropdown) {
-        const id = openDropdown.dataset.dropdown;
-        document.dispatchEvent(new CustomEvent('dropdown-toggled', { 
-          detail: { id: id }
-        }));
-      }
-    });
   }
 
   function render() {
-    // Update week display
-    document.getElementById('week-display').textContent = `Week of ${formatWeekRange(currentWeek)}`;
-    
-    // Update pin button
+    // First ensure all required elements exist
+    const weekDisplayElement = document.getElementById('week-display');
     const pinButton = document.getElementById('pin-button');
-    pinButton.className = `mr-2 ${isPinned ? 'text-black' : 'text-slate-400'}`;
-    
-    // Show loading overlay if loading
     const entriesContainer = document.getElementById('entries-container');
     const addProjectButton = document.getElementById('add-project-button');
     const submitButton = document.getElementById('submit-button');
     
+    // Check if required elements exist, if not, return early
+    if (!weekDisplayElement || !pinButton || !entriesContainer || !addProjectButton || !submitButton) {
+      console.error('Required DOM elements not found. Elements may still be loading or missing.');
+      return; // Exit early if any elements are missing
+    }
+    
+    // Update week display
+    weekDisplayElement.textContent = `Week of ${formatWeekRange(currentWeek)}`;
+    
+    // Update pin button
+    pinButton.className = `mr-2 ${isPinned ? 'text-black' : 'text-slate-400'}`;
+    
+    // Show loading overlay if loading
     if (isLoading) {
       // Show loading state
       entriesContainer.innerHTML = `

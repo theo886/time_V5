@@ -25,7 +25,22 @@ const app = express();
 })();
 
 // Serve static files from the public directory
-app.use(express.static(path.join(__dirname, 'public')));
+const staticPath = path.join(__dirname, 'public');
+app.use(express.static(staticPath));
+console.log(`Serving static files from: ${staticPath}`);
+console.log(`Static files in directory: ${fs.existsSync(staticPath) ? 'Directory exists' : 'Directory MISSING'}`);
+
+// Enhanced error handling for static files in production
+if (process.env.NODE_ENV === 'production') {
+  // Log file access attempts in production
+  app.use((req, res, next) => {
+    const filePath = path.join(staticPath, req.path);
+    if (req.path.endsWith('.js') || req.path.endsWith('.map') || req.path.endsWith('.css')) {
+      console.log(`Accessing: ${req.path}, File exists: ${fs.existsSync(filePath)}`);
+    }
+    next();
+  });
+}
 
 // Parse JSON request body
 app.use(express.json());
