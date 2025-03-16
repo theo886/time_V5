@@ -17,10 +17,28 @@ const app = express();
 // Initialize the database when the server starts
 (async function() {
   try {
+    // Log environment info for debugging
+    console.log('NODE_ENV:', process.env.NODE_ENV);
+    console.log('Running in production mode:', process.env.NODE_ENV === 'production');
+    console.log('Connection string configured:', process.env.AZURE_SQL_CONNECTIONSTRING ? 'YES' : 'NO');
+    
+    if (process.env.NODE_ENV === 'production' && !process.env.AZURE_SQL_CONNECTIONSTRING) {
+      console.error('ERROR: AZURE_SQL_CONNECTIONSTRING environment variable is missing in production mode');
+    }
+    
     await dbService.initializeDatabase();
     console.log('Database initialized successfully');
   } catch (err) {
     console.error('Failed to initialize database:', err);
+    console.error('Error details:', err.message);
+    if (err.stack) console.error('Stack trace:', err.stack);
+    
+    // Check for specific error types
+    if (err.code === 'ELOGIN') {
+      console.error('Authentication failed - check SQL permissions and managed identity setup');
+    } else if (err.code === 'ESOCKET') {
+      console.error('Network error - check firewall settings and connectivity');
+    }
   }
 })();
 
@@ -51,7 +69,22 @@ app.get('/api/timeentries', async (req, res) => {
     // Get user ID (in a real app, this would come from authentication)
     const userId = DEFAULT_USER_ID;
     
+    // Verify database connection first
+    try {
+      const pool = await require('./dbConfig').getPool();
+      console.log('Database connection verified for /api/timeentries endpoint');
+    } catch (connErr) {
+      console.error('Database connection failed in /api/timeentries:', connErr);
+      return res.status(500).json({ 
+        error: 'Database connection failed', 
+        details: connErr.message,
+        code: connErr.code || 'UNKNOWN'
+      });
+    }
+    
+    // Fetch entries
     const entries = await dbService.getTimeEntriesForUser(userId);
+    console.log(`Retrieved ${entries.length} entries for user ${userId}`);
     
     // Transform entries for client-side consumption
     const previousSubmissions = {};
@@ -61,8 +94,15 @@ app.get('/api/timeentries', async (req, res) => {
     
     res.json(previousSubmissions);
   } catch (err) {
-    console.error('API Error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('API Error in /api/timeentries:', err);
+    console.error('Error details:', err.message);
+    if (err.stack) console.error('Stack trace:', err.stack);
+    
+    res.status(500).json({ 
+      error: 'Internal server error', 
+      message: err.message,
+      code: err.code || 'UNKNOWN'
+    });
   }
 });
 
