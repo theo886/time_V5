@@ -22,3 +22,10 @@ local.settings.json
 .DS_Store
 Thumbs.db 
 *storybook.log
+
+# Screenshots and sensitive files
+screenshots/
+*.png
+*.jpg
+*.jpeg
+*.gif
